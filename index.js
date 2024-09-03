@@ -32,7 +32,7 @@ server.listen(PORT, () => {
 
   // Start capturing video from the server's webcam using FFmpeg
   const ffmpeg = exec(
-    `ffmpeg -f avfoundation -framerate 30 -video_size 640x480 -i "0" -f image2pipe -vcodec mjpeg -q:v 2 -`
+    `ffmpeg -f v4l2 -i /dev/video0 -f image2pipe -vcodec mjpeg -q:v 2 -`
   );
 
   // Send video frames to the connected clients
