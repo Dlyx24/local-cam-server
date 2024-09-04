@@ -40,18 +40,22 @@ app.get("/video", (req, res) => {
     "webm",
     "pipe:1",
   ]);
-
-  ffmpeg.stdout.pipe(res);
+  console.log("Client connected ", req.ip);
+  ffmpeg.stdout.on("data", (chunk) => {
+    res.write(chunk);
+  });
 
   ffmpeg.stderr.on("data", (data) => {
-    console.error(`ffmpeg error: ${data}`);
+    // console.log(${data});
   });
 
   res.on("close", () => {
+    console.log("Client disconnected", req.ip, "Shutting down ffmpeg stream");
+
     ffmpeg.kill("SIGINT");
   });
 });
 
-app.listen(3000, () => {
+app.listen(3000, "0.0.0.0", () => {
   console.log("Listening on port 3000");
 });
