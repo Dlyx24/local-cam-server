@@ -1,46 +1,57 @@
+const { spawn } = require("child_process");
 const express = require("express");
-const http = require("http");
-const socketIo = require("socket.io");
-const { exec } = require("child_process");
-
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
 
-// Serve static files
-app.use(express.static("public"));
+app.get("/", (_, res) => {
+  res.sendFile(__dirname + "/index.html");
+});
 
-// Handle socket connections
-io.on("connection", (socket) => {
-  console.log("A user connected");
+app.get("/index.css", (_, res) => {
+  res.sendFile(__dirname + "/index.css");
+});
 
-  socket.on("disconnect", () => {
-    console.log("User disconnected");
+app.get("/video", (req, res) => {
+  const headers = {
+    "Content-Type": "video/webm",
+    "Transfer-Encoding": "chunked",
+    Connection: "keep-alive",
+  };
+
+  res.writeHead(200, headers);
+
+  const ffmpeg = spawn("ffmpeg", [
+    "-f",
+    "video4linux2",
+    "-framerate",
+    "30",
+    "-video_size",
+    "hd720",
+    "-input_format",
+    "mjpeg",
+    "-i",
+    "/dev/video0",
+    "-c:v",
+    "libvpx",
+    "-b:v",
+    "1M",
+    "-c:a",
+    "libvorbis",
+    "-f",
+    "webm",
+    "pipe:1",
+  ]);
+
+  ffmpeg.stdout.pipe(res);
+
+  ffmpeg.stderr.on("data", (data) => {
+    console.error(`ffmpeg error: ${data}`);
   });
 
-  // Handle video frames from the server's webcam
-  socket.on("video-frame", (frame) => {
-    // Broadcast the frame to all connected clients
-    socket.broadcast.emit("video-frame", frame);
+  res.on("close", () => {
+    ffmpeg.kill("SIGINT");
   });
 });
 
-// Start the server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-
-  // Start capturing video from the server's webcam using FFmpeg
-  const ffmpeg = exec(
-    `ffmpeg -f v4l2 -i /dev/video0 -f image2pipe -vcodec mjpeg -q:v 2 -`
-  );
-
-  // Send video frames to the connected clients
-  ffmpeg.stdout.on("data", (data) => {
-    io.emit("video-frame", data.toString("base64"));
-  });
-
-  ffmpeg.stderr.on("data", (data) => {
-    console.error("FFmpeg error:", data.toString());
-  });
+app.listen(3000, () => {
+  console.log("Listening on port 3000");
 });
